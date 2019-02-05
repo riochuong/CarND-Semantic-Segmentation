@@ -28,13 +28,26 @@ def load_vgg(sess, vgg_path):
     # TODO: Implement function
     #   Use tf.saved_model.loader.load to load the model and weights
     vgg_tag = 'vgg16'
+    # load model graph from saved .db file 
+    tf.saved_model.loader.load(sess, [vgg_tag], vgg_path)
+    model_graph = tf.get_default_graph()
+    assert model_graph is not None
     vgg_input_tensor_name = 'image_input:0'
     vgg_keep_prob_tensor_name = 'keep_prob:0'
     vgg_layer3_out_tensor_name = 'layer3_out:0'
     vgg_layer4_out_tensor_name = 'layer4_out:0'
     vgg_layer7_out_tensor_name = 'layer7_out:0'
     
-    return None, None, None, None, None
+    tensors = (
+	model_graph.get_tensor_by_name(vgg_input_tensor_name),
+	model_graph.get_tensor_by_name(vgg_keep_prob_tensor_name),
+	model_graph.get_tensor_by_name(vgg_layer3_out_tensor_name),
+	model_graph.get_tensor_by_name(vgg_layer4_out_tensor_name),
+	model_graph.get_tensor_by_name(vgg_layer7_out_tensor_name),
+    )   
+    print (type(tensors[0])) 
+
+    return tensors 
 tests.test_load_vgg(load_vgg, tf)
 
 
@@ -99,7 +112,6 @@ def run():
     # OPTIONAL: Train and Inference on the cityscapes dataset instead of the Kitti dataset.
     # You'll need a GPU with at least 10 teraFLOPS to train on.
     #  https://www.cityscapes-dataset.com/
-
     with tf.Session() as sess:
         # Path to vgg model
         vgg_path = os.path.join(data_dir, 'vgg')
