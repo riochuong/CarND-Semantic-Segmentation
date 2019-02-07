@@ -28,7 +28,7 @@ def load_vgg(sess, vgg_path):
     # TODO: Implement function
     #   Use tf.saved_model.loader.load to load the model and weights
     vgg_tag = 'vgg16'
-    # load model graph from saved .db file 
+    # load model graph from saved .db file
     tf.saved_model.loader.load(sess, [vgg_tag], vgg_path)
     model_graph = tf.get_default_graph()
     assert model_graph is not None
@@ -37,17 +37,17 @@ def load_vgg(sess, vgg_path):
     vgg_layer3_out_tensor_name = 'layer3_out:0'
     vgg_layer4_out_tensor_name = 'layer4_out:0'
     vgg_layer7_out_tensor_name = 'layer7_out:0'
-    
-    tensors = (
-	model_graph.get_tensor_by_name(vgg_input_tensor_name),
-	model_graph.get_tensor_by_name(vgg_keep_prob_tensor_name),
-	model_graph.get_tensor_by_name(vgg_layer3_out_tensor_name),
-	model_graph.get_tensor_by_name(vgg_layer4_out_tensor_name),
-	model_graph.get_tensor_by_name(vgg_layer7_out_tensor_name),
-    )   
-    print (type(tensors[0])) 
 
-    return tensors 
+    tensors = (
+        model_graph.get_tensor_by_name(vgg_input_tensor_name),
+        model_graph.get_tensor_by_name(vgg_keep_prob_tensor_name),
+        model_graph.get_tensor_by_name(vgg_layer3_out_tensor_name),
+        model_graph.get_tensor_by_name(vgg_layer4_out_tensor_name),
+        model_graph.get_tensor_by_name(vgg_layer7_out_tensor_name),
+    )
+    print (type(tensors[0]))
+
+    return tensors
 tests.test_load_vgg(load_vgg, tf)
 
 
@@ -61,7 +61,15 @@ def layers(vgg_layer3_out, vgg_layer4_out, vgg_layer7_out, num_classes):
     :return: The Tensor for the last layer of output
     """
     # TODO: Implement function
-    return None
+    fcn_8 = tf.layers.conv2d(vgg_layer7_out, num_classes, 1, strides=(1,1), padding='same')
+    fcn_8_2_x = tf.layers.conv2d_transpose(fcn_8, num_classes, 4, strides=(2,2), padding='same')
+    fcn_8_2_x = tf.reshape(fcn_8_2_x, tf.shape(vgg_layer4_out))
+    fuse_1 = tf.add(fcn_8_2_x, vgg_layer4_out)
+    # apply 2nd deconvolution
+    fcn_9_2_x = tf.layers.conv2d_transpose(fuse_1, num_classes, 16, strides=(2,2), padding='same')
+    fcn_9_2_x = tf.reshape(fcn_9_2_x, tf.shape(vgg_layer3_out))
+    fuse_2 = tf.add(fcn_9_2_x, vgg_layer3_out)
+    return tf.reshape(fuse_2, (-1, -1, -1, num_classes))
 tests.test_layers(layers)
 
 
@@ -75,7 +83,11 @@ def optimize(nn_last_layer, correct_label, learning_rate, num_classes):
     :return: Tuple of (logits, train_op, cross_entropy_loss)
     """
     # TODO: Implement function
-    return None, None, None
+    logits = tf.reshape(nn_last_layer, (-1, num_classes))
+    cross_entropy_loss = tf.reduce_mean(tf.nn.softmax_cross_entropy_with_logits(logits=logits, labels=correct_label))
+    optimizer = tf.train.AdamOptimizer(learning_rate)
+    train_op = optimizer.minimize(cross_entropy_loss)
+    return logits, train_op, cross_entropy_loss
 tests.test_optimize(optimize)
 
 
