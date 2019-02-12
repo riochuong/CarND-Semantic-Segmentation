@@ -61,11 +61,12 @@ def layers(vgg_layer3_out, vgg_layer4_out, vgg_layer7_out, num_classes):
     :return: The Tensor for the last layer of output
     """
     # TODO: Implement function
+    # apply first FC and skip layer
     fcn_8 = tf.layers.conv2d(vgg_layer7_out, num_classes, 1, strides=(1,1), padding='same')
     fcn_8_2_x = tf.layers.conv2d_transpose(fcn_8, num_classes, 4, strides=(2,2), padding='same')
     fcn_8_2_x = tf.reshape(fcn_8_2_x, tf.shape(vgg_layer4_out))
     fuse_1 = tf.add(fcn_8_2_x, vgg_layer4_out)
-    # apply 2nd deconvolution
+    # apply 2nd skip layer
     fcn_9_2_x = tf.layers.conv2d_transpose(fuse_1, num_classes, 16, strides=(2,2), padding='same')
     fcn_9_2_x = tf.reshape(fcn_9_2_x, tf.shape(vgg_layer3_out))
     fuse_2 = tf.add(fcn_9_2_x, vgg_layer3_out)
@@ -91,14 +92,16 @@ def optimize(nn_last_layer, correct_label, learning_rate, num_classes):
 tests.test_optimize(optimize)
 
 
-def train_nn(sess, epochs, batch_size, get_batches_fn, train_op, cross_entropy_loss, input_image,
+def train_nn(sess, epochs, batch_size, get_batches_fn, train_op,
+             cross_entropy_loss, input_image,
              correct_label, keep_prob, learning_rate):
     """
     Train neural network and print out the loss during training.
     :param sess: TF Session
     :param epochs: Number of epochs
     :param batch_size: Batch size
-    :param get_batches_fn: Function to get batches of training data.  Call using get_batches_fn(batch_size)
+    :param get_batches_fn: Function to get batches of training data.
+        Call using get_batches_fn(batch_size)
     :param train_op: TF Operation to train the neural network
     :param cross_entropy_loss: TF Tensor for the amount of loss
     :param input_image: TF Placeholder for input images
@@ -107,7 +110,20 @@ def train_nn(sess, epochs, batch_size, get_batches_fn, train_op, cross_entropy_l
     :param learning_rate: TF Placeholder for learning rate
     """
     # TODO: Implement function
-    pass
+    for i in range(epochs):
+        print ("Epoch %d ....." % i)
+        # iterate for each epoch
+        generator = get_batches_fn(batch_size)
+        for next_input, next_label in generator:
+            _, acc = sess.run([train_op, cross_entropy_loss], feed_dict={
+                                learning_rate: 0.0005,
+                                input_image: next_input,
+                                correct_label: next_label,
+                                keep_prob: 0.6
+                            })
+            print ("Acc: %.2f" % acc)
+
+
 tests.test_train_nn(train_nn)
 
 
