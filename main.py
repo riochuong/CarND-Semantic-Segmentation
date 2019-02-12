@@ -62,15 +62,16 @@ def layers(vgg_layer3_out, vgg_layer4_out, vgg_layer7_out, num_classes):
     """
     # TODO: Implement function
     # apply first FC and skip layer
+    l2_reg = 0.00001
     fcn_8 = tf.layers.conv2d(vgg_layer7_out, num_classes, 1, strides=(1,1), padding='same',
-                             kernel_regularizer=tf.contrib.layers.l2_regularizer(scale=0.00001))
+                             kernel_regularizer=tf.contrib.layers.l2_regularizer(scale=l2_reg))
     fcn_8_2_x = tf.layers.conv2d_transpose(fcn_8, num_classes, 4, strides=(2,2), padding='same',
-                                           kernel_regularizer=tf.contrib.layers.l2_regularizer(scale=0.00001))
+                                           kernel_regularizer=tf.contrib.layers.l2_regularizer(scale=l2_reg))
     fcn_8_2_x = tf.reshape(fcn_8_2_x, tf.shape(vgg_layer4_out))
     fuse_1 = tf.add(fcn_8_2_x, vgg_layer4_out)
     # apply 2nd skip layer
     fcn_9_2_x = tf.layers.conv2d_transpose(fuse_1, num_classes, 16, strides=(2,2), padding='same',
-                                           kernel_regularizer=tf.contrib.layers.l2_regularizer(scale=0.00001))
+                                           kernel_regularizer=tf.contrib.layers.l2_regularizer(scale=l2_reg))
     fcn_9_2_x = tf.reshape(fcn_9_2_x, tf.shape(vgg_layer3_out))
     fuse_2 = tf.add(fcn_9_2_x, vgg_layer3_out)
     return tf.reshape(fuse_2, (-1, -1, -1, num_classes))
