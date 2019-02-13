@@ -31,6 +31,7 @@ def load_vgg(sess, vgg_path):
     # load model graph from saved .db file
     tf.saved_model.loader.load(sess, [vgg_tag], vgg_path)
     model_graph = tf.get_default_graph()
+    op = sess.graph.get_operations()
     assert model_graph is not None
     vgg_input_tensor_name = 'image_input:0'
     vgg_keep_prob_tensor_name = 'keep_prob:0'
@@ -63,18 +64,19 @@ def layers(vgg_layer3_out, vgg_layer4_out, vgg_layer7_out, num_classes):
     # TODO: Implement function
     # apply first FC and skip layer
     l2_reg = 0.00001
+    print("Shape", tf.Print(vgg_layer7_out, [vgg_layer7_out]))
     fcn_8 = tf.layers.conv2d(vgg_layer7_out, num_classes, 1, strides=(1,1), padding='same',
                              kernel_regularizer=tf.contrib.layers.l2_regularizer(scale=l2_reg))
-    fcn_8_2_x = tf.layers.conv2d_transpose(fcn_8, num_classes, 4, strides=(2,2), padding='same',
+    fcn_8_2_x = tf.layers.conv2d_transpose(fcn_8, vgg_layer4_out.get_shape()[3], 4, strides=(2,2), padding='same',
                                            kernel_regularizer=tf.contrib.layers.l2_regularizer(scale=l2_reg))
-    fcn_8_2_x = tf.reshape(fcn_8_2_x, tf.shape(vgg_layer4_out))
     fuse_1 = tf.add(fcn_8_2_x, vgg_layer4_out)
-    # apply 2nd skip layer
-    fcn_9_2_x = tf.layers.conv2d_transpose(fuse_1, num_classes, 16, strides=(2,2), padding='same',
+    fcn_9_2_x = tf.layers.conv2d_transpose(fuse_1, vgg_layer3_out.get_shape()[3], 4, strides=(2,2), padding='same',
                                            kernel_regularizer=tf.contrib.layers.l2_regularizer(scale=l2_reg))
-    fcn_9_2_x = tf.reshape(fcn_9_2_x, tf.shape(vgg_layer3_out))
+    print("Shape", tf.Print(fcn_8_2_x, [fcn_8_2_x]))
     fuse_2 = tf.add(fcn_9_2_x, vgg_layer3_out)
-    return tf.reshape(fuse_2, (-1, -1, -1, num_classes))
+    final_layer = tf.layers.conv2d_transpose(fuse_2, num_classes, 16, strides=(8,8), padding='same',
+                                           kernel_regularizer=tf.contrib.layers.l2_regularizer(scale=l2_reg))
+    return tf.reshape(final_layer, (-1, 160, 576, num_classes))
 tests.test_layers(layers)
 
 
@@ -115,6 +117,7 @@ def train_nn(sess, epochs, batch_size, get_batches_fn, train_op,
     :param learning_rate: TF Placeholder for learning rate
     """
     # TODO: Implement function
+    sess.run(tf.global_variables_initializer())
     for i in range(epochs):
         print ("Epoch %d ....." % i)
         # iterate for each epoch
@@ -126,7 +129,7 @@ def train_nn(sess, epochs, batch_size, get_batches_fn, train_op,
                                 correct_label: next_label,
                                 keep_prob: 0.6
                             })
-            print ("Acc: %.2f" % acc)
+            print ("Acc: ", acc)
 
 
 tests.test_train_nn(train_nn)
@@ -138,7 +141,7 @@ def run():
     data_dir = './data'
     runs_dir = './runs'
     tests.test_for_kitti_dataset(data_dir)
-    epochs = 5
+    epochs = 10
     batch_size = 32
     # Download pretrained vgg model
     helper.maybe_download_pretrained_vgg(data_dir)
@@ -156,16 +159,16 @@ def run():
         #  https://datascience.stackexchange.com/questions/5224/how-to-prepare-augment-images-for-neural-network
 
         # TODO: Build NN using load_vgg, layers, and optimize function
-        tensors = (sess, vgg_path)
+        tensors = load_vgg(sess, vgg_path)
         network = layers(tensors[2], tensors[3], tensors[4], num_classes)
 
         # TODO: Train NN using the train_nn function
         learning_rate = tf.placeholder(tf.float32, name="learning_rate")
         correct_label = tf.placeholder(tf.int32, [None, image_shape[0], image_shape[1], num_classes], name="correct_label")
         logits, train_op, loss = optimize(network, correct_label, learning_rate, num_classes)
-        train_nn(sess, epochs, batch_size, helper.get_batch_function(), train_op, cross_entropy_loss, tesnsors[0], correct_label, tensors[1], learning_rate)
+        train_nn(sess, epochs, batch_size, get_batches_fn, train_op, loss, tensors[0], correct_label, tensors[1], learning_rate)
         # TODO: Save inference data using helper.save_inference_samples
-        helper.save_inference_samples(runs_dir, data_dir, sess, image_shape, logits, keep_prob, input_image)
+        helper.save_inference_samples(runs_dir, data_dir, sess, image_shape, logits, tensors[1], tensors[0])
 
         # OPTIONAL: Apply the trained model to a video
 
